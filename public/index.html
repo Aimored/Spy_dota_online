@@ -166,7 +166,16 @@
 
     socket.on('yourRole', (data) => {
       isSpy = false;
-      document.getElementById('role').innerText = `Ваша роль: ${data.role}`;
+      let attrLabel = '';
+      switch(data.attribute) {
+        case 'strength': attrLabel = 'Сила 💪'; break;
+        case 'agility': attrLabel = 'Ловкость ⚡'; break;
+        case 'intelligence': attrLabel = 'Интеллект 🔮'; break;
+        case 'universal': attrLabel = 'Универсальный 🌐'; break;
+        default: attrLabel = 'Неизвестно';
+      }
+      document.getElementById('role').innerHTML = 
+        `Ваша роль: <strong>${data.role}</strong> (${attrLabel})`;
       document.getElementById('voteSection').style.display = 'block';
       document.getElementById('startBtn').style.display = 'none';
       renderHeroGrid(data.role, false);
@@ -201,9 +210,6 @@
         <button onclick="restartGame()">Начать заново</button>
       `;
       document.getElementById('voteSection').style.display = 'none';
-      if (!isSpy) {
-        renderHeroGrid(roomsData?.trueHero, false);
-      }
     });
 
     socket.on('gameRestarted', () => {
@@ -238,6 +244,29 @@
         grid.appendChild(searchBox);
       }
 
+      // Герои из server.js не передаются, поэтому используем локальный список
+      const heroesList = [
+        "Abaddon", "Alchemist", "Ancient Apparition", "Anti-Mage", "Arc Warden", "Axe",
+        "Bane", "Batrider", "Beastmaster", "Bloodseeker", "Bounty Hunter", "Brewmaster",
+        "Bristleback", "Broodmother", "Centaur Warrunner", "Chaos Knight", "Chen", "Clinkz",
+        "Clockwerk", "Crystal Maiden", "Dark Seer", "Dark Willow", "Dawnbreaker", "Dazzle",
+        "Disruptor", "Doom", "Dragon Knight", "Drow Ranger", "Earth Spirit", "Earthshaker",
+        "Elder Titan", "Ember Spirit", "Enchantress", "Faceless Void", "Grimstroke", "Gyrocopter",
+        "Hoodwink", "Huskar", "Invoker", "Io", "Jakiro", "Juggernaut", "Keeper of the Light",
+        "Kunkka", "Legion Commander", "Leshrac", "Lich", "Lifestealer", "Lina", "Lion", "Lone Druid",
+        "Luna", "Lycan", "Magnus", "Marci", "Mars", "Medusa", "Meepo", "Mirana", "Monkey King",
+        "Morphling", "Muerta", "Naga Siren", "Nature's Prophet", "Necrophos", "Night Stalker",
+        "Nyx Assassin", "Ogre Magi", "Omniknight", "Oracle", "Outworld Destroyer", "Pangolier",
+        "Phantom Assassin", "Phantom Lancer", "Phoenix", "Primal Beast", "Puck", "Pudge",
+        "Queen of Pain", "Razor", "Riki", "Rubick", "Sand King", "Shadow Demon", "Shadow Fiend",
+        "Shadow Shaman", "Silencer", "Skywrath Mage", "Slardar", "Slark", "Snapfire", "Sniper",
+        "Spectre", "Spirit Breaker", "Storm Spirit", "Sven", "Techies", "Templar Assassin",
+        "Terrorblade", "Tidehunter", "Timbersaw", "Tinker", "Tiny", "Treant Protector",
+        "Troll Warlord", "Tusk", "Underlord", "Undying", "Ursa", "Vengeful Spirit", "Venomancer",
+        "Viper", "Visage", "Void Spirit", "Warlock", "Weaver", "Windranger", "Winter Wyvern",
+        "Witch Doctor", "Wraith King", "Zeus"
+      ];
+
       heroesList.forEach(name => {
         const btn = document.createElement('div');
         btn.className = 'hero-btn';
@@ -268,7 +297,7 @@
       const container = document.getElementById('playerButtons');
       container.innerHTML = '';
       players.forEach(player => {
-        if (player.id === myId) return; // нельзя голосовать против себя
+        if (player.id === myId) return;
         const btn = document.createElement('div');
         btn.className = 'player-btn';
         btn.innerText = player.name;
@@ -289,130 +318,6 @@
         socket.emit('startGame', currentRoom);
       }
     }
-
-    const heroesList = [
-      "Abaddon",
-      "Alchemist",
-      "Ancient Apparition",
-      "Anti-Mage",
-      "Arc Warden",
-      "Axe",
-      "Bane",
-      "Batrider",
-      "Beastmaster",
-      "Bloodseeker",
-      "Bounty Hunter",
-      "Brewmaster",
-      "Bristleback",
-      "Broodmother",
-      "Centaur Warrunner",
-      "Chaos Knight",
-      "Chen",
-      "Clinkz",
-      "Clockwerk",
-      "Crystal Maiden",
-      "Dark Seer",
-      "Dark Willow",
-      "Dawnbreaker",
-      "Dazzle",
-      "Disruptor",
-      "Doom",
-      "Dragon Knight",
-      "Drow Ranger",
-      "Earth Spirit",
-      "Earthshaker",
-      "Elder Titan",
-      "Ember Spirit",
-      "Enchantress",
-      "Faceless Void",
-      "Grimstroke",
-      "Gyrocopter",
-      "Hoodwink",
-      "Huskar",
-      "Invoker",
-      "Io",
-      "Jakiro",
-      "Juggernaut",
-      "Keeper of the Light",
-      "Kunkka",
-      "Legion Commander",
-      "Leshrac",
-      "Lich",
-      "Lifestealer",
-      "Lina",
-      "Lion",
-      "Lone Druid",
-      "Luna",
-      "Lycan",
-      "Magnus",
-      "Marci",
-      "Mars",
-      "Medusa",
-      "Meepo",
-      "Mirana",
-      "Monkey King",
-      "Morphling",
-      "Muerta",
-      "Naga Siren",
-      "Nature's Prophet",
-      "Necrophos",
-      "Night Stalker",
-      "Nyx Assassin",
-      "Ogre Magi",
-      "Omniknight",
-      "Oracle",
-      "Outworld Destroyer",
-      "Pangolier",
-      "Phantom Assassin",
-      "Phantom Lancer",
-      "Phoenix",
-      "Primal Beast",
-      "Puck",
-      "Pudge",
-      "Queen of Pain",
-      "Razor",
-      "Riki",
-      "Rubick",
-      "Sand King",
-      "Shadow Demon",
-      "Shadow Fiend",
-      "Shadow Shaman",
-      "Silencer",
-      "Skywrath Mage",
-      "Slardar",
-      "Slark",
-      "Snapfire",
-      "Sniper",
-      "Spectre",
-      "Spirit Breaker",
-      "Storm Spirit",
-      "Sven",
-      "Techies",
-      "Templar Assassin",
-      "Terrorblade",
-      "Tidehunter",
-      "Timbersaw",
-      "Tinker",
-      "Tiny",
-      "Treant Protector",
-      "Troll Warlord",
-      "Tusk",
-      "Underlord",
-      "Undying",
-      "Ursa",
-      "Vengeful Spirit",
-      "Venomancer",
-      "Viper",
-      "Visage",
-      "Void Spirit",
-      "Warlock",
-      "Weaver",
-      "Windranger",
-      "Winter Wyvern",
-      "Witch Doctor",
-      "Wraith King",
-      "Zeus"
-    ];
   </script>
 </body>
 </html>

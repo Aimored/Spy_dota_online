@@ -14,24 +14,46 @@ const io = socketIo(server, {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-const heroes = [
-  "Anti-Mage", "Axe", "Bane", "Bloodseeker", "Crystal Maiden", "Drow Ranger",
-  "Earthshaker", "Juggernaut", "Mirana", "Morphling", "Shadow Fiend", "Phantom Lancer",
-  "Puck", "Pudge", "Razor", "Sand King", "Storm Spirit", "Sven", "Tiny", "Vengeful Spirit",
-  "Windranger", "Zeus", "Kunkka", "Lina", "Lion", "Necrophos", "Ogre Magi", "Riki", "Sniper",
-  "Templar Assassin", "Viper", "Luna", "Dragon Knight", "Dazzle", "Clockwerk", "Leshrac",
-  "Nature's Prophet", "Lifestealer", "Dark Seer", "Clinkz", "Omniknight", "Enchantress",
-  "Huskar", "Night Stalker", "Broodmother", "Bounty Hunter", "Weaver", "Jakiro", "Batrider",
-  "Chen", "Spectre", "Ancient Apparition", "Doom", "Ursa", "Spirit Breaker", "Gyrocopter",
-  "Alchemist", "Invoker", "Silencer", "Outworld Destroyer", "Lycan", "Brewmaster",
-  "Shadow Shaman", "Lone Druid", "Chaos Knight", "Meepo", "Treant Protector", "Undying",
-  "Rubick", "Disruptor", "Nyx Assassin", "Naga Siren", "Keeper of the Light", "Io",
-  "Visage", "Slark", "Medusa", "Troll Warlord", "Tusk", "Bristleback", "Skywrath Mage",
-  "Abaddon", "Elder Titan", "Legion Commander", "Techies", "Ember Spirit", "Earth Spirit",
-  "Abyssal Underlord", "Terrorblade", "Phoenix", "Oracle", "Winter Wyvern", "Arc Warden",
-  "Monkey King", "Dark Willow", "Pangolier", "Grimstroke", "Hoodwink", "Void Spirit",
-  "Snapfire", "Mars", "Dawnbreaker", "Marci", "Primal Beast", "Muerta"
-];
+// Классификация по атрибутам (источник: cyber.sports.ru)
+const heroesByAttribute = {
+  strength: [
+    "Ogre Magi", "Alchemist", "Axe", "Bristleback", "Centaur Warrunner", "Chaos Knight",
+    "Dawnbreaker", "Doom", "Dragon Knight", "Earth Spirit", "Earthshaker", "Elder Titan",
+    "Huskar", "Kunkka", "Legion Commander", "Lifestealer", "Mars", "Night Stalker",
+    "Omniknight", "Primal Beast", "Pudge", "Slardar", "Spirit Breaker", "Sven",
+    "Tidehunter", "Tiny", "Treant Protector", "Tusk", "Underlord", "Undying", "Wraith King"
+  ],
+  agility: [
+    "Anti-Mage", "Arc Warden", "Bloodseeker", "Bounty Hunter", "Clinkz", "Drow Ranger",
+    "Ember Spirit", "Faceless Void", "Gyrocopter", "Hoodwink", "Juggernaut", "Luna",
+    "Medusa", "Meepo", "Monkey King", "Morphling", "Naga Siren", "Phantom Assassin",
+    "Phantom Lancer", "Razor", "Riki", "Shadow Fiend", "Slark", "Sniper", "Templar Assassin",
+    "Terrorblade", "Troll Warlord", "Ursa", "Viper", "Weaver"
+  ],
+  intelligence: [
+    "Ancient Apparition", "Crystal Maiden", "Death Prophet", "Disruptor", "Enchantress",
+    "Grimstroke", "Invoker", "Jakiro", "Keeper of the Light", "Leshrac", "Lich", "Lina",
+    "Lion", "Muerta", "Nature’s Prophet", "Necrophos", "Oracle", "Outworld Destroyer", "Puck",
+    "Pugna", "Queen of Pain", "Rubick", "Shadow Demon", "Shadow Shaman",
+    "Silencer", "Skywrath Mage", "Storm Spirit", "Tinker", "Warlock", "Witch Doctor", "Zeus"
+  ],
+  universal: [
+    "Abaddon", "Bane", "Batrider", "Chen", "Beastmaster", "Brewmaster", "Broodmother",
+    "Clockwerk", "Dark Seer", "Dark Willow", "Dazzle", "Enigma", "Io", "Lone Druid",
+    "Lycan", "Magnus", "Marci", "Mirana", "Nyx Assassin", "Pangolier", "Phoenix", "Sand King",
+    "Snapfire", "Techies", "Timbersaw", "Vengeful Spirit", "Venomancer", "Visage",
+    "Void Spirit", "Windranger", "Winter Wyvern"
+  ]
+};
+
+// Получить плоский список для шпиона
+const getAllHeroes = () => {
+  const all = new Set();
+  for (const list of Object.values(heroesByAttribute)) {
+    list.forEach(hero => all.add(hero));
+  }
+  return Array.from(all);
+};
 
 const rooms = {};
 
@@ -47,6 +69,7 @@ io.on('connection', (socket) => {
         started: false,
         votes: {},
         trueHero: null,
+        heroAttribute: null,
         spyId: null,
         spyErrors: 0
       };
@@ -60,21 +83,31 @@ io.on('connection', (socket) => {
     const room = rooms[roomId];
     if (!room || room.started || room.players.length < 2) return;
 
-    const trueHero = heroes[Math.floor(Math.random() * heroes.length)];
+    const attributes = Object.keys(heroesByAttribute);
+    const randomAttr = attributes[Math.floor(Math.random() * attributes.length)];
+    const heroList = heroesByAttribute[randomAttr];
+    const trueHero = heroList[Math.floor(Math.random() * heroList.length)];
+
     const spyIndex = Math.floor(Math.random() * room.players.length);
     const spyId = room.players[spyIndex].id;
 
     room.started = true;
     room.votes = {};
     room.trueHero = trueHero;
+    room.heroAttribute = randomAttr;
     room.spyId = spyId;
     room.spyErrors = 0;
 
+    const allHeroes = getAllHeroes();
+
     room.players.forEach((player, i) => {
       if (i === spyIndex) {
-        io.to(player.id).emit('chooseSpyHero', { heroes });
+        io.to(player.id).emit('chooseSpyHero', { heroes: allHeroes });
       } else {
-        io.to(player.id).emit('yourRole', { role: trueHero });
+        io.to(player.id).emit('yourRole', { 
+          role: trueHero, 
+          attribute: randomAttr 
+        });
       }
     });
     io.to(roomId).emit('gameStarted');
@@ -150,6 +183,7 @@ io.on('connection', (socket) => {
     room.started = false;
     room.votes = {};
     room.trueHero = null;
+    room.heroAttribute = null;
     room.spyId = null;
     room.spyErrors = 0;
 
