@@ -47,8 +47,7 @@ io.on('connection', (socket) => {
         started: false,
         votes: {},
         trueHero: null,
-        spyId: null,
-        spyErrors: 0
+        spyId: null
       };
     }
     const player = { id: socket.id, name: playerName };
@@ -68,11 +67,10 @@ io.on('connection', (socket) => {
     room.votes = {};
     room.trueHero = trueHero;
     room.spyId = spyId;
-    room.spyErrors = 0;
 
     room.players.forEach((player, i) => {
       if (i === spyIndex) {
-        io.to(player.id).emit('chooseSpyHero', { heroes });
+        io.to(player.id).emit('chooseSpyHero', { heroes, trueHero });
       } else {
         io.to(player.id).emit('yourRole', { role: trueHero });
       }
@@ -80,24 +78,21 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('gameStarted');
   });
 
-  socket.on('chooseHero', ({ roomId, hero }) => {
+  socket.on('spyGuess', ({ roomId, guess }) => {
     const room = rooms[roomId];
-    if (!room || !room.started || socket.id !== room.spyId) return;
+    if (!room || socket.id !== room.spyId) return;
 
-    room.spyErrors++;
-    if (room.spyErrors >= 5) {
-      // Раскрываем шпиона
+    if (guess === room.trueHero) {
       const spy = room.players.find(p => p.id === room.spyId);
       io.to(roomId).emit('gameEnd', {
-        winner: 'players',
-        message: `Шпион раскрыт после 5 ошибок! Это был ${spy.name}!`,
+        winner: 'spy',
+        message: `Шпион угадал героя и победил! Это был ${spy.name}!`,
         spyName: spy.name
       });
-      return;
+    } else {
+      // Отправляем только шпиону, что герой неправильный
+      io.to(socket.id).emit('heroIncorrect', { guess });
     }
-
-    // Отправляем шпиону его текущий выбор (для интерфейса)
-    io.to(socket.id).emit('yourRole', { role: hero });
   });
 
   socket.on('vote', ({ roomId, targetId }) => {
@@ -107,16 +102,43 @@ io.on('connection', (socket) => {
     if (!room.votes[targetId]) room.votes[targetId] = [];
     const voterId = socket.id;
 
+    // Удаляем предыдущий голос игрока
     for (const tId in room.votes) {
       room.votes[tId] = room.votes[tId].filter(id => id !== voterId);
     }
     room.votes[targetId].push(voterId);
+
+    // Проверка: все, кроме одного (шпиона), проголосовали за одного
+    const totalPlayers = room.players.length;
+    const nonSpyCount = totalPlayers - 1;
+    let accusedId = null;
+    for (const tId in room.votes) {
+      if (room.votes[tId].length === nonSpyCount) {
+        // Убедимся, что шпион не голосовал за этого игрока
+        if (!room.votes[tId].includes(room.spyId)) {
+          accusedId = tId;
+          break;
+        }
+      }
+    }
 
     const voteSummary = {};
     for (const tId in room.votes) {
       voteSummary[tId] = room.votes[tId].length;
     }
     io.to(roomId).emit('updateVotes', voteSummary);
+
+    if (accusedId) {
+      const accused = room.players.find(p => p.id === accusedId);
+      const spy = room.players.find(p => p.id === room.spyId);
+      if (accusedId === room.spyId) {
+        io.to(roomId).emit('gameEnd', {
+          winner: 'players',
+          message: `Шпион раскрыт! Это был ${spy.name}!`,
+          spyName: spy.name
+        });
+      }
+    }
   });
 
   socket.on('disconnect', () => {});

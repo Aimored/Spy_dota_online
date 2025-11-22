@@ -29,6 +29,31 @@
       margin: 20px 0;
       font-weight: bold;
     }
+    #heroGrid {
+      display: none;
+      margin: 20px auto;
+      max-width: 800px;
+      text-align: left;
+    }
+    .hero-btn {
+      display: inline-block;
+      margin: 4px;
+      padding: 6px 10px;
+      background: #e3f2fd;
+      border: 1px solid #90caf9;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      min-width: 100px;
+    }
+    .hero-btn:hover {
+      background: #bbdefb;
+    }
+    .hero-btn.incorrect {
+      text-decoration: line-through;
+      color: #f44336;
+      pointer-events: none;
+    }
     #result {
       font-size: 20px;
       color: #1976d2;
@@ -69,10 +94,14 @@
   <div id="game">
     <h2>Комната: <span id="roomName"></span></h2>
     <div id="players">Ожидание игроков...</div>
+    
+    <div id="heroGrid"></div>
+
     <div id="voteSection" style="display:none; margin:20px 0;">
       <p><strong>Выберите подозреваемого:</strong></p>
       <div id="playerButtons"></div>
     </div>
+    
     <button id="startBtn" onclick="startGame()">Начать игру (только ведущему)</button>
     <div id="role"></div>
     <div id="result"></div>
@@ -84,6 +113,7 @@
     let currentRoom = '';
     let myId = '';
     let players = [];
+    let isSpy = false;
 
     socket.on('connect', () => { myId = socket.id; });
 
@@ -119,6 +149,7 @@
     });
 
     socket.on('yourRole', (data) => {
+      isSpy = false;
       document.getElementById('role').innerText = `Ваша роль: ${data.role}`;
       document.getElementById('voteSection').style.display = 'block';
       document.getElementById('startBtn').style.display = 'none';
@@ -126,43 +157,43 @@
     });
 
     socket.on('chooseSpyHero', (data) => {
-      const container = document.getElementById('role');
-      container.innerHTML = `
-        <strong>Вы — ШПИОН! Выберите героя (осталось попыток: <span id="attempts">5</span>):</strong><br>
-        <select id="spyHeroSelect"></select>
-        <button onclick="confirmSpyHero()">Выбрать</button>
-      `;
-      const select = document.getElementById('spyHeroSelect');
+      isSpy = true;
+      document.getElementById('role').innerText = 'Вы — ШПИОН! Угадайте героя:';
+      const grid = document.getElementById('heroGrid');
+      grid.innerHTML = '';
       data.heroes.forEach(name => {
-        const option = document.createElement('option');
-        option.value = name;
-        option.textContent = name;
-        select.appendChild(option);
+        const btn = document.createElement('div');
+        btn.className = 'hero-btn';
+        btn.innerText = name;
+        btn.onclick = () => {
+          socket.emit('spyGuess', { roomId: currentRoom, guess: name });
+        };
+        grid.appendChild(btn);
+      });
+      grid.style.display = 'block';
+    });
+
+    socket.on('heroIncorrect', (data) => {
+      // Зачеркнуть кнопку
+      const buttons = document.querySelectorAll('.hero-btn');
+      buttons.forEach(btn => {
+        if (btn.innerText === data.guess) {
+          btn.classList.add('incorrect');
+        }
       });
     });
 
     socket.on('updateVotes', (voteSummary) => {
-      renderPlayerButtons(voteSummary);
+      if (!isSpy) {
+        renderPlayerButtons(voteSummary);
+      }
     });
 
     socket.on('gameEnd', (data) => {
       document.getElementById('result').innerText = data.message;
       document.getElementById('voteSection').style.display = 'none';
+      document.getElementById('heroGrid').style.display = 'none';
     });
-
-    function confirmSpyHero() {
-      const hero = document.getElementById('spyHeroSelect').value;
-      socket.emit('chooseHero', { roomId: currentRoom, hero });
-      // Обновляем интерфейс: уменьшаем попытки
-      const attemptsEl = document.getElementById('attempts');
-      if (attemptsEl) {
-        let attempts = parseInt(attemptsEl.innerText) - 1;
-        attemptsEl.innerText = attempts;
-        if (attempts <= 0) {
-          document.getElementById('role').innerHTML = 'Вы исчерпали все попытки!';
-        }
-      }
-    }
 
     function renderPlayerButtons(voteSummary) {
       if (!players || players.length === 0) return;
