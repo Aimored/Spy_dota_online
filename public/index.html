@@ -54,6 +54,11 @@
       color: #f44336;
       pointer-events: none;
     }
+    .hero-btn.highlight {
+      background-color: #fff9c4;
+      border: 2px solid #ffc107;
+      box-shadow: 0 0 5px rgba(255, 193, 7, 0.6);
+    }
     #result {
       font-size: 20px;
       color: #1976d2;
@@ -114,6 +119,7 @@
     let myId = '';
     let players = [];
     let isSpy = false;
+    let gameEnded = false;
 
     socket.on('connect', () => { myId = socket.id; });
 
@@ -140,6 +146,16 @@
       document.getElementById('roomName').innerText = roomId;
       document.getElementById('lobby').style.display = 'none';
       document.getElementById('game').style.display = 'block';
+      resetUI();
+    }
+
+    function resetUI() {
+      gameEnded = false;
+      document.getElementById('result').innerHTML = '';
+      document.getElementById('heroGrid').style.display = 'none';
+      document.getElementById('voteSection').style.display = 'none';
+      document.getElementById('startBtn').style.display = 'inline-block';
+      isSpy = false;
     }
 
     socket.on('updatePlayers', (updatedPlayers) => {
@@ -153,47 +169,101 @@
       document.getElementById('role').innerText = `Ваша роль: ${data.role}`;
       document.getElementById('voteSection').style.display = 'block';
       document.getElementById('startBtn').style.display = 'none';
+      renderHeroGrid(data.role, false);
       renderPlayerButtons({});
     });
 
     socket.on('chooseSpyHero', (data) => {
       isSpy = true;
       document.getElementById('role').innerText = 'Вы — ШПИОН! Угадайте героя:';
-      const grid = document.getElementById('heroGrid');
-      grid.innerHTML = '';
-      data.heroes.forEach(name => {
-        const btn = document.createElement('div');
-        btn.className = 'hero-btn';
-        btn.innerText = name;
-        btn.onclick = () => {
-          socket.emit('spyGuess', { roomId: currentRoom, guess: name });
-        };
-        grid.appendChild(btn);
-      });
-      grid.style.display = 'block';
+      renderHeroGrid(null, true);
     });
 
     socket.on('heroIncorrect', (data) => {
-      // Зачеркнуть кнопку
       const buttons = document.querySelectorAll('.hero-btn');
       buttons.forEach(btn => {
-        if (btn.innerText === data.guess) {
+        if (btn.dataset.name === data.guess) {
           btn.classList.add('incorrect');
         }
       });
     });
 
     socket.on('updateVotes', (voteSummary) => {
-      if (!isSpy) {
+      if (!gameEnded) {
         renderPlayerButtons(voteSummary);
       }
     });
 
     socket.on('gameEnd', (data) => {
-      document.getElementById('result').innerText = data.message;
+      gameEnded = true;
+      document.getElementById('result').innerHTML = `
+        ${data.message}<br>
+        <button onclick="restartGame()">Начать заново</button>
+      `;
       document.getElementById('voteSection').style.display = 'none';
-      document.getElementById('heroGrid').style.display = 'none';
+      if (!isSpy) {
+        // Показываем правильного героя
+        const trueHero = roomsData?.trueHero;
+        renderHeroGrid(data.spyName ? roomsData?.trueHero : null, false);
+      }
     });
+
+    socket.on('gameRestarted', () => {
+      resetUI();
+    });
+
+    function restartGame() {
+      socket.emit('restartGame', { roomId: currentRoom });
+    }
+
+    function renderHeroGrid(correctHero, interactive) {
+      const grid = document.getElementById('heroGrid');
+      grid.innerHTML = '';
+
+      if (interactive) {
+        const searchBox = document.createElement('input');
+        searchBox.id = 'spySearch';
+        searchBox.placeholder = 'Поиск героя...';
+        searchBox.style.marginBottom = '10px';
+        searchBox.style.padding = '6px';
+        searchBox.style.width = '100%';
+        searchBox.style.maxWidth = '400px';
+        searchBox.oninput = () => {
+          const query = searchBox.value.trim().toLowerCase();
+          document.querySelectorAll('.hero-btn').forEach(btn => {
+            btn.classList.remove('highlight');
+            if (query && btn.dataset.name.toLowerCase().includes(query)) {
+              btn.classList.add('highlight');
+            }
+          });
+        };
+        grid.appendChild(searchBox);
+      }
+
+      heroesList.forEach(name => {
+        const btn = document.createElement('div');
+        btn.className = 'hero-btn';
+        btn.innerText = name;
+        btn.dataset.name = name;
+
+        if (interactive) {
+          btn.onclick = () => {
+            socket.emit('spyGuess', { roomId: currentRoom, guess: name });
+          };
+        } else {
+          btn.style.opacity = '0.6';
+          btn.style.cursor = 'default';
+          btn.style.backgroundColor = '#f5f5f5';
+          if (correctHero && name === correctHero) {
+            btn.style.border = '2px solid #4caf50';
+          }
+        }
+
+        grid.appendChild(btn);
+      });
+
+      grid.style.display = 'block';
+    }
 
     function renderPlayerButtons(voteSummary) {
       if (!players || players.length === 0) return;
@@ -221,6 +291,25 @@
         socket.emit('startGame', currentRoom);
       }
     }
+
+    const heroesList = [
+      "Anti-Mage", "Axe", "Bane", "Bloodseeker", "Crystal Maiden", "Drow Ranger",
+      "Earthshaker", "Juggernaut", "Mirana", "Morphling", "Shadow Fiend", "Phantom Lancer",
+      "Puck", "Pudge", "Razor", "Sand King", "Storm Spirit", "Sven", "Tiny", "Vengeful Spirit",
+      "Windranger", "Zeus", "Kunkka", "Lina", "Lion", "Necrophos", "Ogre Magi", "Riki", "Sniper",
+      "Templar Assassin", "Viper", "Luna", "Dragon Knight", "Dazzle", "Clockwerk", "Leshrac",
+      "Nature's Prophet", "Lifestealer", "Dark Seer", "Clinkz", "Omniknight", "Enchantress",
+      "Huskar", "Night Stalker", "Broodmother", "Bounty Hunter", "Weaver", "Jakiro", "Batrider",
+      "Chen", "Spectre", "Ancient Apparition", "Doom", "Ursa", "Spirit Breaker", "Gyrocopter",
+      "Alchemist", "Invoker", "Silencer", "Outworld Destroyer", "Lycan", "Brewmaster",
+      "Shadow Shaman", "Lone Druid", "Chaos Knight", "Meepo", "Treant Protector", "Undying",
+      "Rubick", "Disruptor", "Nyx Assassin", "Naga Siren", "Keeper of the Light", "Io",
+      "Visage", "Slark", "Medusa", "Troll Warlord", "Tusk", "Bristleback", "Skywrath Mage",
+      "Abaddon", "Elder Titan", "Legion Commander", "Techies", "Ember Spirit", "Earth Spirit",
+      "Abyssal Underlord", "Terrorblade", "Phoenix", "Oracle", "Winter Wyvern", "Arc Warden",
+      "Monkey King", "Dark Willow", "Pangolier", "Grimstroke", "Hoodwink", "Void Spirit",
+      "Snapfire", "Mars", "Dawnbreaker", "Marci", "Primal Beast", "Muerta"
+    ];
   </script>
 </body>
 </html>
