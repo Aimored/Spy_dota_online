@@ -1,49 +1,148 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-  <meta charset="utf-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Шпион: Dota 2</title>
   <style>
-    body { font-family: sans-serif; text-align: center; padding: 20px; }
-    #result { margin-top: 20px; font-size: 18px; }
-    button { padding: 10px 20px; font-size: 16px; }
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 15px;
+      background: #f9f9f9;
+    }
+    input, button {
+      padding: 8px;
+      margin: 5px;
+      font-size: 16px;
+      border-radius: 4px;
+    }
+    #game {
+      display: none;
+      margin-top: 20px;
+    }
+    #role {
+      font-size: 24px;
+      color: #d32f2f;
+      margin: 20px 0;
+      font-weight: bold;
+    }
+    #players {
+      margin: 15px 0;
+      font-size: 18px;
+    }
+    .player-btn {
+      display: inline-block;
+      margin: 5px;
+      padding: 8px 12px;
+      background: #e0e0e0;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      cursor: pointer;
+      min-width: 100px;
+    }
+    .player-btn:hover {
+      background: #d0d0d0;
+    }
+    .votes {
+      font-size: 14px;
+      color: #555;
+      margin-top: 4px;
+    }
   </style>
 </head>
 <body>
-  <h1>Шпион: Dota 2</h1>
-  <p>Введите имена игроков (через запятую):</p>
-  <input id="names" type="text" placeholder="Алиса, Боб, Вика" size="50">
-  <br><br>
-  <button onclick="startGame()">Начать игру</button>
-  <div id="result"></div>
+  <h1>🕵️‍♂️ Шпион: Dota 2</h1>
+  <p>
+    <input type="text" id="playerName" placeholder="Ваше имя" maxlength="20">
+  </p>
+  <p>
+    <input type="text" id="roomId" placeholder="Код комнаты (латиница)" maxlength="20">
+  </p>
+  <button onclick="joinRoom()">Войти в комнату</button>
 
+  <div id="game">
+    <h2>Комната: <span id="roomName"></span></h2>
+    <div id="players">Ожидание игроков...</div>
+    <div id="voteSection" style="display:none; margin:20px 0;">
+      <p><strong>Выберите подозреваемого:</strong></p>
+      <div id="playerButtons"></div>
+    </div>
+    <button id="startBtn" onclick="startGame()">Начать игру (только ведущему)</button>
+    <div id="role"></div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
   <script>
-    const heroes = [
-      "Anti-Mage", "Axe", "Pudge", "Invoker", "Doom", "Lina", "Sniper",
-      "Juggernaut", "Crystal Maiden", "Shadow Fiend", "Phantom Assassin",
-      "Luna", "Zeus", "Riki", "Necrophos", "Rubick", "Terrorblade", "Muerta"
-      // добавь всех героев по желанию
-    ];
+    const socket = io();
+    let currentRoom = '';
+    let myId = '';
+    let players = [];
 
-    function startGame() {
-      const namesInput = document.getElementById("names").value;
-      const names = namesInput.split(',').map(n => n.trim()).filter(n => n);
-      if (names.length < 3) {
-        alert("Нужно минимум 3 игрока!");
+    // Сохраняем ID сокета
+    socket.on('connect', () => {
+      myId = socket.id;
+    });
+
+    function joinRoom() {
+      const name = document.getElementById('playerName').value.trim();
+      const roomId = document.getElementById('roomId').value.trim();
+      if (!name || !roomId) {
+        alert('Введите имя и код комнаты!');
         return;
       }
+      currentRoom = roomId;
+      socket.emit('joinRoom', { roomId, playerName: name });
+      document.getElementById('roomName').innerText = roomId;
+      document.getElementById('game').style.display = 'block';
+    }
 
-      const hero = heroes[Math.floor(Math.random() * heroes.length)];
-      const spyIndex = Math.floor(Math.random() * names.length);
-      let html = "<h3>Раздайте игрокам (НЕ ПОКАЗЫВАЙТЕ ЭКРАН!):</h3><ul>";
+    socket.on('updatePlayers', (updatedPlayers) => {
+      players = updatedPlayers;
+      const names = players.map(p => p.name).join(', ');
+      document.getElementById('players').innerHTML = `<strong>Игроки (${players.length}):</strong> ${names}`;
+    });
 
-      names.forEach((name, i) => {
-        const role = (i === spyIndex) ? "ШПИОН" : hero;
-        html += `<li><strong>${name}:</strong> ${role}</li>`;
+    socket.on('yourRole', (data) => {
+      document.getElementById('role').innerText = `Ваша роль: ${data.role}`;
+      // Показываем кнопки голосования только после начала игры
+      document.getElementById('voteSection').style.display = 'block';
+      document.getElementById('startBtn').style.display = 'none';
+      renderPlayerButtons({});
+    });
+
+    socket.on('gameStarted', () => {
+      // Уже обрабатывается в yourRole
+    });
+
+    socket.on('updateVotes', (voteSummary) => {
+      renderPlayerButtons(voteSummary);
+    });
+
+    function renderPlayerButtons(voteSummary) {
+      const container = document.getElementById('playerButtons');
+      container.innerHTML = '';
+      players.forEach(player => {
+        if (player.id === myId) return; // нельзя голосовать против себя
+        const btn = document.createElement('div');
+        btn.className = 'player-btn';
+        btn.innerText = player.name;
+        btn.onclick = () => {
+          socket.emit('vote', { roomId: currentRoom, targetId: player.id });
+        };
+        const votes = voteSummary[player.id] || 0;
+        const voteEl = document.createElement('div');
+        voteEl.className = 'votes';
+        voteEl.innerText = `${votes} голос(ов)`;
+        btn.appendChild(voteEl);
+        container.appendChild(btn);
       });
+    }
 
-      html += "</ul><p>Обсуждайте, кто шпион!</p>";
-      document.getElementById("result").innerHTML = html;
+    function startGame() {
+      if (currentRoom) {
+        socket.emit('startGame', currentRoom);
+      }
     }
   </script>
 </body>
