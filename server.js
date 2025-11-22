@@ -14,7 +14,6 @@ const io = socketIo(server, {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Классификация по атрибутам (источник: cyber.sports.ru)
 const heroesByAttribute = {
   strength: [
     "Ogre Magi", "Alchemist", "Axe", "Bristleback", "Centaur Warrunner", "Chaos Knight",
@@ -44,15 +43,6 @@ const heroesByAttribute = {
     "Snapfire", "Techies", "Timbersaw", "Vengeful Spirit", "Venomancer", "Visage",
     "Void Spirit", "Windranger", "Winter Wyvern"
   ]
-};
-
-// Получить плоский список для шпиона
-const getAllHeroes = () => {
-  const all = new Set();
-  for (const list of Object.values(heroesByAttribute)) {
-    list.forEach(hero => all.add(hero));
-  }
-  return Array.from(all);
 };
 
 const rooms = {};
@@ -98,11 +88,9 @@ io.on('connection', (socket) => {
     room.spyId = spyId;
     room.spyErrors = 0;
 
-    const allHeroes = getAllHeroes();
-
     room.players.forEach((player, i) => {
       if (i === spyIndex) {
-        io.to(player.id).emit('chooseSpyHero', { heroes: allHeroes });
+        io.to(player.id).emit('chooseSpyHero', { heroesByAttribute });
       } else {
         io.to(player.id).emit('yourRole', { 
           role: trueHero, 
@@ -146,11 +134,13 @@ io.on('connection', (socket) => {
     if (!room.votes[targetId]) room.votes[targetId] = [];
     const voterId = socket.id;
 
+    // Удаляем предыдущий голос игрока
     for (const tId in room.votes) {
       room.votes[tId] = room.votes[tId].filter(id => id !== voterId);
     }
     room.votes[targetId].push(voterId);
 
+    // Подсчёт: если почти все проголосовали за одного — раскрытие
     const totalPlayers = room.players.length;
     let accusedId = null;
     for (const tId in room.votes) {

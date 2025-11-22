@@ -83,6 +83,15 @@
       color: #555;
       margin-top: 4px;
     }
+    .attr-section {
+      margin-bottom: 20px;
+    }
+    .attr-title {
+      font-size: 18px;
+      margin: 10px 0 8px;
+      color: #222;
+      text-align: left;
+    }
   </style>
 </head>
 <body>
@@ -120,6 +129,7 @@
     let players = [];
     let isSpy = false;
     let gameEnded = false;
+    let receivedHeroes = null;
 
     socket.on('connect', () => { myId = socket.id; });
 
@@ -156,6 +166,7 @@
       document.getElementById('voteSection').style.display = 'none';
       document.getElementById('startBtn').style.display = 'inline-block';
       isSpy = false;
+      receivedHeroes = null;
     }
 
     socket.on('updatePlayers', (updatedPlayers) => {
@@ -184,6 +195,7 @@
 
     socket.on('chooseSpyHero', (data) => {
       isSpy = true;
+      receivedHeroes = data.heroesByAttribute;
       document.getElementById('role').innerText = 'Вы — ШПИОН! Угадайте героя:';
       renderHeroGrid(null, true);
     });
@@ -224,14 +236,14 @@
       const grid = document.getElementById('heroGrid');
       grid.innerHTML = '';
 
-      if (interactive) {
+      if (interactive && receivedHeroes) {
         const searchBox = document.createElement('input');
         searchBox.id = 'spySearch';
         searchBox.placeholder = 'Поиск героя...';
-        searchBox.style.marginBottom = '10px';
-        searchBox.style.padding = '6px';
+        searchBox.style.marginBottom = '15px';
+        searchBox.style.padding = '8px';
         searchBox.style.width = '100%';
-        searchBox.style.maxWidth = '400px';
+        searchBox.style.maxWidth = '500px';
         searchBox.oninput = () => {
           const query = searchBox.value.trim().toLowerCase();
           document.querySelectorAll('.hero-btn').forEach(btn => {
@@ -242,52 +254,75 @@
           });
         };
         grid.appendChild(searchBox);
-      }
 
-      // Герои из server.js не передаются, поэтому используем локальный список
-      const heroesList = [
-        "Abaddon", "Alchemist", "Ancient Apparition", "Anti-Mage", "Arc Warden", "Axe",
-        "Bane", "Batrider", "Beastmaster", "Bloodseeker", "Bounty Hunter", "Brewmaster",
-        "Bristleback", "Broodmother", "Centaur Warrunner", "Chaos Knight", "Chen", "Clinkz",
-        "Clockwerk", "Crystal Maiden", "Dark Seer", "Dark Willow", "Dawnbreaker", "Dazzle",
-        "Disruptor", "Doom", "Dragon Knight", "Drow Ranger", "Earth Spirit", "Earthshaker",
-        "Elder Titan", "Ember Spirit", "Enchantress", "Faceless Void", "Grimstroke", "Gyrocopter",
-        "Hoodwink", "Huskar", "Invoker", "Io", "Jakiro", "Juggernaut", "Keeper of the Light",
-        "Kunkka", "Legion Commander", "Leshrac", "Lich", "Lifestealer", "Lina", "Lion", "Lone Druid",
-        "Luna", "Lycan", "Magnus", "Marci", "Mars", "Medusa", "Meepo", "Mirana", "Monkey King",
-        "Morphling", "Muerta", "Naga Siren", "Nature's Prophet", "Necrophos", "Night Stalker",
-        "Nyx Assassin", "Ogre Magi", "Omniknight", "Oracle", "Outworld Destroyer", "Pangolier",
-        "Phantom Assassin", "Phantom Lancer", "Phoenix", "Primal Beast", "Puck", "Pudge",
-        "Queen of Pain", "Razor", "Riki", "Rubick", "Sand King", "Shadow Demon", "Shadow Fiend",
-        "Shadow Shaman", "Silencer", "Skywrath Mage", "Slardar", "Slark", "Snapfire", "Sniper",
-        "Spectre", "Spirit Breaker", "Storm Spirit", "Sven", "Techies", "Templar Assassin",
-        "Terrorblade", "Tidehunter", "Timbersaw", "Tinker", "Tiny", "Treant Protector",
-        "Troll Warlord", "Tusk", "Underlord", "Undying", "Ursa", "Vengeful Spirit", "Venomancer",
-        "Viper", "Visage", "Void Spirit", "Warlock", "Weaver", "Windranger", "Winter Wyvern",
-        "Witch Doctor", "Wraith King", "Zeus"
-      ];
+        const attrNames = {
+          strength: 'Сила 💪',
+          agility: 'Ловкость ⚡',
+          intelligence: 'Интеллект 🔮',
+          universal: 'Универсальные 🌐'
+        };
 
-      heroesList.forEach(name => {
-        const btn = document.createElement('div');
-        btn.className = 'hero-btn';
-        btn.innerText = name;
-        btn.dataset.name = name;
+        for (const [attr, heroes] of Object.entries(receivedHeroes)) {
+          const section = document.createElement('div');
+          section.className = 'attr-section';
 
-        if (interactive) {
-          btn.onclick = () => {
-            socket.emit('spyGuess', { roomId: currentRoom, guess: name });
-          };
-        } else {
-          btn.style.opacity = '0.6';
-          btn.style.cursor = 'default';
-          btn.style.backgroundColor = '#f5f5f5';
+          const title = document.createElement('div');
+          title.className = 'attr-title';
+          title.textContent = attrNames[attr] || attr;
+          section.appendChild(title);
+
+          const container = document.createElement('div');
+          container.style.display = 'flex';
+          container.style.flexWrap = 'wrap';
+
+          heroes.forEach(name => {
+            const btn = document.createElement('div');
+            btn.className = 'hero-btn';
+            btn.innerText = name;
+            btn.dataset.name = name;
+            btn.onclick = () => {
+              socket.emit('spyGuess', { roomId: currentRoom, guess: name });
+            };
+            container.appendChild(btn);
+          });
+
+          section.appendChild(container);
+          grid.appendChild(section);
+        }
+      } else {
+        const heroesList = [
+          "Abaddon", "Alchemist", "Ancient Apparition", "Anti-Mage", "Arc Warden", "Axe",
+          "Bane", "Batrider", "Beastmaster", "Bloodseeker", "Bounty Hunter", "Brewmaster",
+          "Bristleback", "Broodmother", "Centaur Warrunner", "Chaos Knight", "Chen", "Clinkz",
+          "Clockwerk", "Crystal Maiden", "Dark Seer", "Dark Willow", "Dawnbreaker", "Dazzle",
+          "Disruptor", "Doom", "Dragon Knight", "Drow Ranger", "Earth Spirit", "Earthshaker",
+          "Elder Titan", "Ember Spirit", "Enchantress", "Faceless Void", "Grimstroke", "Gyrocopter",
+          "Hoodwink", "Huskar", "Invoker", "Io", "Jakiro", "Juggernaut", "Keeper of the Light",
+          "Kunkka", "Legion Commander", "Leshrac", "Lich", "Lifestealer", "Lina", "Lion", "Lone Druid",
+          "Luna", "Lycan", "Magnus", "Marci", "Mars", "Medusa", "Meepo", "Mirana", "Monkey King",
+          "Morphling", "Muerta", "Naga Siren", "Nature's Prophet", "Necrophos", "Night Stalker",
+          "Nyx Assassin", "Ogre Magi", "Omniknight", "Oracle", "Outworld Destroyer", "Pangolier",
+          "Phantom Assassin", "Phantom Lancer", "Phoenix", "Primal Beast", "Puck", "Pudge",
+          "Queen of Pain", "Razor", "Riki", "Rubick", "Sand King", "Shadow Demon", "Shadow Fiend",
+          "Shadow Shaman", "Silencer", "Skywrath Mage", "Slardar", "Slark", "Snapfire", "Sniper",
+          "Spectre", "Spirit Breaker", "Storm Spirit", "Sven", "Techies", "Templar Assassin",
+          "Terrorblade", "Tidehunter", "Timbersaw", "Tinker", "Tiny", "Treant Protector",
+          "Troll Warlord", "Tusk", "Underlord", "Undying", "Ursa", "Vengeful Spirit", "Venomancer",
+          "Viper", "Visage", "Void Spirit", "Warlock", "Weaver", "Windranger", "Winter Wyvern",
+          "Witch Doctor", "Wraith King", "Zeus"
+        ];
+
+        heroesList.forEach(name => {
+          const btn = document.createElement('div');
+          btn.className = 'hero-btn';
+          btn.innerText = name;
+          btn.dataset.name = name;
           if (correctHero && name === correctHero) {
             btn.style.border = '2px solid #4caf50';
           }
-        }
-
-        grid.appendChild(btn);
-      });
+          grid.appendChild(btn);
+        });
+      }
 
       grid.style.display = 'block';
     }
