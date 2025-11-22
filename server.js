@@ -45,7 +45,10 @@ io.on('connection', (socket) => {
       rooms[roomId] = {
         players: [],
         started: false,
-        votes: {} // голоса: { playerId: voterId[] }
+        votes: {},
+        trueHero: null,
+        spyId: null,
+        spyErrors: 0
       };
     }
     const player = { id: socket.id, name: playerName };
@@ -57,36 +60,58 @@ io.on('connection', (socket) => {
     const room = rooms[roomId];
     if (!room || room.started || room.players.length < 2) return;
 
-    room.started = true;
-    room.votes = {}; // сброс голосов
-    const hero = heroes[Math.floor(Math.random() * heroes.length)];
+    const trueHero = heroes[Math.floor(Math.random() * heroes.length)];
     const spyIndex = Math.floor(Math.random() * room.players.length);
+    const spyId = room.players[spyIndex].id;
+
+    room.started = true;
+    room.votes = {};
+    room.trueHero = trueHero;
+    room.spyId = spyId;
+    room.spyErrors = 0;
 
     room.players.forEach((player, i) => {
-      const role = i === spyIndex ? "ШПИОН" : hero;
-      io.to(player.id).emit('yourRole', { role });
+      if (i === spyIndex) {
+        io.to(player.id).emit('chooseSpyHero', { heroes });
+      } else {
+        io.to(player.id).emit('yourRole', { role: trueHero });
+      }
     });
-
     io.to(roomId).emit('gameStarted');
+  });
+
+  socket.on('chooseHero', ({ roomId, hero }) => {
+    const room = rooms[roomId];
+    if (!room || !room.started || socket.id !== room.spyId) return;
+
+    room.spyErrors++;
+    if (room.spyErrors >= 5) {
+      // Раскрываем шпиона
+      const spy = room.players.find(p => p.id === room.spyId);
+      io.to(roomId).emit('gameEnd', {
+        winner: 'players',
+        message: `Шпион раскрыт после 5 ошибок! Это был ${spy.name}!`,
+        spyName: spy.name
+      });
+      return;
+    }
+
+    // Отправляем шпиону его текущий выбор (для интерфейса)
+    io.to(socket.id).emit('yourRole', { role: hero });
   });
 
   socket.on('vote', ({ roomId, targetId }) => {
     const room = rooms[roomId];
     if (!room || !room.started) return;
 
-    // Инициализация голосов за цель
     if (!room.votes[targetId]) room.votes[targetId] = [];
     const voterId = socket.id;
 
-    // Удаляем старый голос игрока (если был)
     for (const tId in room.votes) {
       room.votes[tId] = room.votes[tId].filter(id => id !== voterId);
     }
-
-    // Добавляем новый голос
     room.votes[targetId].push(voterId);
 
-    // Отправляем обновлённые итоги ВСЕМ
     const voteSummary = {};
     for (const tId in room.votes) {
       voteSummary[tId] = room.votes[tId].length;
@@ -94,9 +119,7 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('updateVotes', voteSummary);
   });
 
-  socket.on('disconnect', () => {
-    // Можно реализовать удаление игрока, но для простоты — пропускаем
-  });
+  socket.on('disconnect', () => {});
 });
 
 const PORT = parseInt(process.env.PORT, 10) || 3000;

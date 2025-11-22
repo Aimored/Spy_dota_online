@@ -17,9 +17,11 @@
       font-size: 16px;
       border-radius: 4px;
     }
+    #lobby, #game {
+      margin-top: 20px;
+    }
     #game {
       display: none;
-      margin-top: 20px;
     }
     #role {
       font-size: 24px;
@@ -27,9 +29,11 @@
       margin: 20px 0;
       font-weight: bold;
     }
-    #players {
-      margin: 15px 0;
-      font-size: 18px;
+    #result {
+      font-size: 20px;
+      color: #1976d2;
+      margin: 20px 0;
+      font-weight: bold;
     }
     .player-btn {
       display: inline-block;
@@ -53,13 +57,14 @@
 </head>
 <body>
   <h1>🕵️‍♂️ Шпион: Dota 2</h1>
-  <p>
-    <input type="text" id="playerName" placeholder="Ваше имя" maxlength="20">
-  </p>
-  <p>
-    <input type="text" id="roomId" placeholder="Код комнаты (латиница)" maxlength="20">
-  </p>
-  <button onclick="joinRoom()">Войти в комнату</button>
+
+  <div id="lobby">
+    <p><input type="text" id="playerName" placeholder="Ваше имя" maxlength="20"></p>
+    <button onclick="createRoom()">Создать комнату</button>
+    <p>— ИЛИ —</p>
+    <p><input type="text" id="joinRoomId" placeholder="Код комнаты (латиница)" maxlength="20"></p>
+    <button onclick="joinRoom()">Войти в комнату</button>
+  </div>
 
   <div id="game">
     <h2>Комната: <span id="roomName"></span></h2>
@@ -70,6 +75,7 @@
     </div>
     <button id="startBtn" onclick="startGame()">Начать игру (только ведущему)</button>
     <div id="role"></div>
+    <div id="result"></div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
@@ -79,21 +85,30 @@
     let myId = '';
     let players = [];
 
-    // Сохраняем ID сокета
-    socket.on('connect', () => {
-      myId = socket.id;
-    });
+    socket.on('connect', () => { myId = socket.id; });
+
+    function generateRoomCode() {
+      return Math.random().toString(36).substring(2, 8).toUpperCase();
+    }
+
+    function createRoom() {
+      const name = document.getElementById('playerName').value.trim();
+      if (!name) return alert('Введите имя!');
+      enterRoom(generateRoomCode(), name);
+    }
 
     function joinRoom() {
       const name = document.getElementById('playerName').value.trim();
-      const roomId = document.getElementById('roomId').value.trim();
-      if (!name || !roomId) {
-        alert('Введите имя и код комнаты!');
-        return;
-      }
+      const roomId = document.getElementById('joinRoomId').value.trim().toUpperCase();
+      if (!name || !roomId) return alert('Введите имя и код комнаты!');
+      enterRoom(roomId, name);
+    }
+
+    function enterRoom(roomId, name) {
       currentRoom = roomId;
       socket.emit('joinRoom', { roomId, playerName: name });
       document.getElementById('roomName').innerText = roomId;
+      document.getElementById('lobby').style.display = 'none';
       document.getElementById('game').style.display = 'block';
     }
 
@@ -105,25 +120,56 @@
 
     socket.on('yourRole', (data) => {
       document.getElementById('role').innerText = `Ваша роль: ${data.role}`;
-      // Показываем кнопки голосования только после начала игры
       document.getElementById('voteSection').style.display = 'block';
       document.getElementById('startBtn').style.display = 'none';
       renderPlayerButtons({});
     });
 
-    socket.on('gameStarted', () => {
-      // Уже обрабатывается в yourRole
+    socket.on('chooseSpyHero', (data) => {
+      const container = document.getElementById('role');
+      container.innerHTML = `
+        <strong>Вы — ШПИОН! Выберите героя (осталось попыток: <span id="attempts">5</span>):</strong><br>
+        <select id="spyHeroSelect"></select>
+        <button onclick="confirmSpyHero()">Выбрать</button>
+      `;
+      const select = document.getElementById('spyHeroSelect');
+      data.heroes.forEach(name => {
+        const option = document.createElement('option');
+        option.value = name;
+        option.textContent = name;
+        select.appendChild(option);
+      });
     });
 
     socket.on('updateVotes', (voteSummary) => {
       renderPlayerButtons(voteSummary);
     });
 
+    socket.on('gameEnd', (data) => {
+      document.getElementById('result').innerText = data.message;
+      document.getElementById('voteSection').style.display = 'none';
+    });
+
+    function confirmSpyHero() {
+      const hero = document.getElementById('spyHeroSelect').value;
+      socket.emit('chooseHero', { roomId: currentRoom, hero });
+      // Обновляем интерфейс: уменьшаем попытки
+      const attemptsEl = document.getElementById('attempts');
+      if (attemptsEl) {
+        let attempts = parseInt(attemptsEl.innerText) - 1;
+        attemptsEl.innerText = attempts;
+        if (attempts <= 0) {
+          document.getElementById('role').innerHTML = 'Вы исчерпали все попытки!';
+        }
+      }
+    }
+
     function renderPlayerButtons(voteSummary) {
+      if (!players || players.length === 0) return;
       const container = document.getElementById('playerButtons');
       container.innerHTML = '';
       players.forEach(player => {
-        if (player.id === myId) return; // нельзя голосовать против себя
+        if (player.id === myId) return;
         const btn = document.createElement('div');
         btn.className = 'player-btn';
         btn.innerText = player.name;
