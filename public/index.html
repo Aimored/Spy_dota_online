@@ -197,7 +197,11 @@
       isSpy = true;
       receivedHeroes = data.heroesByAttribute;
       document.getElementById('role').innerText = 'Вы — ШПИОН! Угадайте героя:';
+      // ✅ Включаем голосование для шпиона
+      document.getElementById('voteSection').style.display = 'block';
+      document.getElementById('startBtn').style.display = 'none';
       renderHeroGrid(null, true);
+      renderPlayerButtons({}); // ✅ Обновляем список игроков
     });
 
     socket.on('heroIncorrect', (data) => {
@@ -332,7 +336,7 @@
       const container = document.getElementById('playerButtons');
       container.innerHTML = '';
       players.forEach(player => {
-        if (player.id === myId) return;
+        if (player.id === myId) return; // нельзя голосовать против себя
         const btn = document.createElement('div');
         btn.className = 'player-btn';
         btn.innerText = player.name;
