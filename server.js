@@ -47,7 +47,8 @@ io.on('connection', (socket) => {
         started: false,
         votes: {},
         trueHero: null,
-        spyId: null
+        spyId: null,
+        spyErrors: 0
       };
     }
     const player = { id: socket.id, name: playerName };
@@ -67,6 +68,7 @@ io.on('connection', (socket) => {
     room.votes = {};
     room.trueHero = trueHero;
     room.spyId = spyId;
+    room.spyErrors = 0; // сброс счётчика при старте
 
     room.players.forEach((player, i) => {
       if (i === spyIndex) {
@@ -90,7 +92,19 @@ io.on('connection', (socket) => {
         spyName: spy.name
       });
     } else {
-      io.to(socket.id).emit('heroIncorrect', { guess });
+      room.spyErrors = (room.spyErrors || 0) + 1;
+
+      if (room.spyErrors >= 5) {
+        // 5 ошибок — шпион раскрыт
+        const spy = room.players.find(p => p.id === room.spyId);
+        io.to(roomId).emit('gameEnd', {
+          winner: 'players',
+          message: `Шпион раскрыт после 5 ошибок! Это был ${spy.name}!`,
+          spyName: spy.name
+        });
+      } else {
+        io.to(socket.id).emit('heroIncorrect', { guess });
+      }
     }
   });
 
@@ -140,11 +154,14 @@ io.on('connection', (socket) => {
     room.votes = {};
     room.trueHero = null;
     room.spyId = null;
+    room.spyErrors = 0; // сброс счётчика при перезапуске
 
     io.to(roomId).emit('gameRestarted');
   });
 
-  socket.on('disconnect', () => {});
+  socket.on('disconnect', () => {
+    // Опционально: можно удалять игрока из комнаты
+  });
 });
 
 const PORT = parseInt(process.env.PORT, 10) || 3000;
