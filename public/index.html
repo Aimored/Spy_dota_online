@@ -202,9 +202,7 @@
       `;
       document.getElementById('voteSection').style.display = 'none';
       if (!isSpy) {
-        // Показываем правильного героя
-        const trueHero = roomsData?.trueHero;
-        renderHeroGrid(data.spyName ? roomsData?.trueHero : null, false);
+        renderHeroGrid(roomsData?.trueHero, false);
       }
     });
 
@@ -270,7 +268,7 @@
       const container = document.getElementById('playerButtons');
       container.innerHTML = '';
       players.forEach(player => {
-        if (player.id === myId) return;
+        if (player.id === myId) return; // нельзя голосовать против себя
         const btn = document.createElement('div');
         btn.className = 'player-btn';
         btn.innerText = player.name;
