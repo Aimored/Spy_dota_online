@@ -197,11 +197,10 @@
       isSpy = true;
       receivedHeroes = data.heroesByAttribute;
       document.getElementById('role').innerText = 'Вы — ШПИОН! Угадайте героя:';
-      // ✅ Включаем голосование для шпиона
       document.getElementById('voteSection').style.display = 'block';
       document.getElementById('startBtn').style.display = 'none';
       renderHeroGrid(null, true);
-      renderPlayerButtons({}); // ✅ Обновляем список игроков
+      renderPlayerButtons({});
     });
 
     socket.on('heroIncorrect', (data) => {
@@ -222,7 +221,10 @@
     socket.on('gameEnd', (data) => {
       gameEnded = true;
       document.getElementById('result').innerHTML = `
-        ${data.message}<br>
+        <div style="background:#f0f0f0; padding:15px; border-radius:8px; margin:15px auto; max-width:600px;">
+          <strong>Игра окончена!</strong><br>
+          ${data.message}
+        </div>
         <button onclick="restartGame()">Начать заново</button>
       `;
       document.getElementById('voteSection').style.display = 'none';
@@ -336,7 +338,7 @@
       const container = document.getElementById('playerButtons');
       container.innerHTML = '';
       players.forEach(player => {
-        if (player.id === myId) return; // нельзя голосовать против себя
+        if (player.id === myId) return;
         const btn = document.createElement('div');
         btn.className = 'player-btn';
         btn.innerText = player.name;
