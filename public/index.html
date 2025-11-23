@@ -123,7 +123,14 @@
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
-    const socket = io();
+    const socket = io({
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    timeout: 20000
+    });
+    
     let currentRoom = '';
     let myId = '';
     let players = [];
@@ -131,8 +138,11 @@
     let gameEnded = false;
     let receivedHeroes = null;
 
-    socket.on('connect', () => { myId = socket.id; });
-
+    socket.on('connect_error', () => {
+      setTimeout(() => {
+        socket.connect();
+      }, 3000);
+    });
     function generateRoomCode() {
       return Math.random().toString(36).substring(2, 8).toUpperCase();
     }
