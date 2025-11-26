@@ -37,6 +37,22 @@
       --accent-color: #64b5f6;
     }
 
+    [data-theme="pink"] {
+      --bg-color: #ffeef2;
+      --text-color: #5a2a45;
+      --card-bg: #ffd6e0;
+      --input-bg: #ffebf0;
+      --btn-bg: #ff9ec4;
+      --btn-hover: #ff7fb8;
+      --hero-bg: #ffc4d6;
+      --hero-hover: #ff9ec4;
+      --highlight-bg: #fff0f5;
+      --highlight-border: #ff69b4;
+      --error-color: #d32f2f;
+      --success-color: #388e3c;
+      --accent-color: #ad1457;
+    }
+
     body {
       font-family: Arial, sans-serif;
       text-align: center;
@@ -44,6 +60,7 @@
       background-color: var(--bg-color);
       color: var(--text-color);
       transition: background-color 0.3s, color 0.3s;
+      margin: 0;
     }
 
     input, button {
@@ -54,6 +71,49 @@
       background-color: var(--input-bg);
       color: var(--text-color);
       border: 1px solid var(--btn-bg);
+    }
+
+    #themeSelector {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      display: inline-block;
+    }
+
+    #themeToggleBtn {
+      padding: 6px 12px;
+      font-size: 18px;
+      border-radius: 6px;
+      cursor: pointer;
+      background: var(--btn-bg);
+      border: 1px solid #777;
+    }
+
+    #themeMenu {
+      display: none;
+      position: absolute;
+      top: 40px;
+      right: 0;
+      background: var(--card-bg);
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      z-index: 1000;
+    }
+
+    #themeMenu button {
+      display: block;
+      width: 100%;
+      padding: 8px;
+      background: none;
+      border: none;
+      text-align: left;
+      cursor: pointer;
+      color: var(--text-color);
+    }
+
+    #themeMenu button:hover {
+      background: var(--btn-hover);
     }
 
     #lobby, #game {
@@ -132,7 +192,7 @@
 
     .votes {
       font-size: 14px;
-      color: #aaa;
+      color: #888;
       margin-top: 4px;
     }
 
@@ -146,22 +206,18 @@
       color: var(--text-color);
       text-align: left;
     }
-
-    #themeToggle {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      padding: 6px 10px;
-      font-size: 18px;
-      border-radius: 50%;
-      cursor: pointer;
-      background: var(--btn-bg);
-      border: 1px solid #777;
-    }
   </style>
 </head>
 <body>
-  <button id="themeToggle" onclick="toggleTheme()">🌙</button>
+  <div id="themeSelector">
+    <button id="themeToggleBtn" onclick="toggleThemeMenu()">🎨</button>
+    <div id="themeMenu">
+      <button onclick="setTheme('light')">Светлая</button>
+      <button onclick="setTheme('dark')">Тёмная</button>
+      <button onclick="setTheme('pink')">Розовая 💖</button>
+    </div>
+  </div>
+
   <h1>🕵️‍♂️ Шпион: Dota 2</h1>
 
   <div id="lobby">
@@ -205,26 +261,42 @@
     let gameEnded = false;
     let receivedHeroes = null;
 
-    // Восстановление темы при загрузке
-    const savedTheme = localStorage.getItem('theme') || 'light';
-    if (savedTheme === 'dark') {
-      document.documentElement.setAttribute('data-theme', 'dark');
-      document.getElementById('themeToggle').innerText = '☀️';
-    }
-
-    function toggleTheme() {
-      const current = document.documentElement.getAttribute('data-theme');
-      if (current === 'dark') {
+    // === УПРАВЛЕНИЕ ТЕМОЙ ===
+    function setTheme(theme) {
+      localStorage.setItem('theme', theme);
+      if (theme === 'light') {
         document.documentElement.removeAttribute('data-theme');
-        localStorage.setItem('theme', 'light');
-        document.getElementById('themeToggle').innerText = '🌙';
+        document.getElementById('themeToggleBtn').innerText = '🎨';
       } else {
-        document.documentElement.setAttribute('data-theme', 'dark');
-        localStorage.setItem('theme', 'dark');
-        document.getElementById('themeToggle').innerText = '☀️';
+        document.documentElement.setAttribute('data-theme', theme);
+        if (theme === 'dark') document.getElementById('themeToggleBtn').innerText = '🌙';
+        if (theme === 'pink') document.getElementById('themeToggleBtn').innerText = '💖';
       }
+      hideThemeMenu();
     }
 
+    function toggleThemeMenu() {
+      const menu = document.getElementById('themeMenu');
+      menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+    }
+
+    function hideThemeMenu() {
+      document.getElementById('themeMenu').style.display = 'none';
+    }
+
+    // Закрывать меню при клике вне его
+    document.addEventListener('click', (e) => {
+      const selector = document.getElementById('themeSelector');
+      if (!selector.contains(e.target)) {
+        hideThemeMenu();
+      }
+    });
+
+    // Восстановление темы
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    setTheme(savedTheme);
+
+    // === ОСТАЛЬНОЙ КОД ===
     socket.on('connect_error', () => {
       setTimeout(() => {
         socket.connect();
