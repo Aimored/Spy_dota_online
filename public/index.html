@@ -5,96 +5,163 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Шпион: Dota 2</title>
   <style>
+    :root {
+      --bg-color: #f9f9f9;
+      --text-color: #000;
+      --card-bg: #fff;
+      --input-bg: #fff;
+      --btn-bg: #e0e0e0;
+      --btn-hover: #d0d0d0;
+      --hero-bg: #e3f2fd;
+      --hero-hover: #bbdefb;
+      --highlight-bg: #fff9c4;
+      --highlight-border: #ffc107;
+      --error-color: #f44336;
+      --success-color: #4caf50;
+      --accent-color: #1976d2;
+    }
+
+    [data-theme="dark"] {
+      --bg-color: #121212;
+      --text-color: #fff;
+      --card-bg: #1e1e1e;
+      --input-bg: #2c2c2c;
+      --btn-bg: #333;
+      --btn-hover: #444;
+      --hero-bg: #2c3e50;
+      --hero-hover: #34495e;
+      --highlight-bg: #4a3c0a;
+      --highlight-border: #d4af37;
+      --error-color: #ff6b6b;
+      --success-color: #6bff7e;
+      --accent-color: #64b5f6;
+    }
+
     body {
       font-family: Arial, sans-serif;
       text-align: center;
       padding: 15px;
-      background: #f9f9f9;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      transition: background-color 0.3s, color 0.3s;
     }
+
     input, button {
       padding: 8px;
       margin: 5px;
       font-size: 16px;
       border-radius: 4px;
+      background-color: var(--input-bg);
+      color: var(--text-color);
+      border: 1px solid var(--btn-bg);
     }
+
     #lobby, #game {
       margin-top: 20px;
     }
+
     #game {
       display: none;
     }
+
     #role {
       font-size: 24px;
-      color: #d32f2f;
+      color: var(--error-color);
       margin: 20px 0;
       font-weight: bold;
     }
+
     #heroGrid {
       display: none;
       margin: 20px auto;
       max-width: 800px;
       text-align: left;
     }
+
     .hero-btn {
       display: inline-block;
       margin: 4px;
       padding: 6px 10px;
-      background: #e3f2fd;
-      border: 1px solid #90caf9;
+      background: var(--hero-bg);
+      border: 1px solid var(--hero-hover);
       border-radius: 4px;
       cursor: pointer;
       font-size: 14px;
       min-width: 100px;
+      color: var(--text-color);
     }
+
     .hero-btn:hover {
-      background: #bbdefb;
+      background: var(--hero-hover);
     }
+
     .hero-btn.incorrect {
       text-decoration: line-through;
-      color: #f44336;
+      color: var(--error-color);
       pointer-events: none;
     }
+
     .hero-btn.highlight {
-      background-color: #fff9c4;
-      border: 2px solid #ffc107;
+      background-color: var(--highlight-bg);
+      border: 2px solid var(--highlight-border);
       box-shadow: 0 0 5px rgba(255, 193, 7, 0.6);
     }
+
     #result {
       font-size: 20px;
-      color: #1976d2;
+      color: var(--accent-color);
       margin: 20px 0;
       font-weight: bold;
     }
+
     .player-btn {
       display: inline-block;
       margin: 5px;
       padding: 8px 12px;
-      background: #e0e0e0;
-      border: 1px solid #ccc;
+      background: var(--btn-bg);
+      border: 1px solid #555;
       border-radius: 6px;
       cursor: pointer;
       min-width: 100px;
+      color: var(--text-color);
     }
+
     .player-btn:hover {
-      background: #d0d0d0;
+      background: var(--btn-hover);
     }
+
     .votes {
       font-size: 14px;
-      color: #555;
+      color: #aaa;
       margin-top: 4px;
     }
+
     .attr-section {
       margin-bottom: 20px;
     }
+
     .attr-title {
       font-size: 18px;
       margin: 10px 0 8px;
-      color: #222;
+      color: var(--text-color);
       text-align: left;
+    }
+
+    #themeToggle {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 6px 10px;
+      font-size: 18px;
+      border-radius: 50%;
+      cursor: pointer;
+      background: var(--btn-bg);
+      border: 1px solid #777;
     }
   </style>
 </head>
 <body>
+  <button id="themeToggle" onclick="toggleTheme()">🌙</button>
   <h1>🕵️‍♂️ Шпион: Dota 2</h1>
 
   <div id="lobby">
@@ -124,11 +191,11 @@
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io({
-    reconnection: true,
-    reconnectionAttempts: Infinity,
-    reconnectionDelay: 1000,
-    reconnectionDelayMax: 5000,
-    timeout: 20000
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000
     });
     
     let currentRoom = '';
@@ -138,11 +205,32 @@
     let gameEnded = false;
     let receivedHeroes = null;
 
+    // Восстановление темы при загрузке
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    if (savedTheme === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      document.getElementById('themeToggle').innerText = '☀️';
+    }
+
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      if (current === 'dark') {
+        document.documentElement.removeAttribute('data-theme');
+        localStorage.setItem('theme', 'light');
+        document.getElementById('themeToggle').innerText = '🌙';
+      } else {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        localStorage.setItem('theme', 'dark');
+        document.getElementById('themeToggle').innerText = '☀️';
+      }
+    }
+
     socket.on('connect_error', () => {
       setTimeout(() => {
         socket.connect();
       }, 3000);
     });
+
     function generateRoomCode() {
       return Math.random().toString(36).substring(2, 8).toUpperCase();
     }
@@ -231,7 +319,7 @@
     socket.on('gameEnd', (data) => {
       gameEnded = true;
       document.getElementById('result').innerHTML = `
-        <div style="background:#f0f0f0; padding:15px; border-radius:8px; margin:15px auto; max-width:600px;">
+        <div style="background:var(--card-bg); padding:15px; border-radius:8px; margin:15px auto; max-width:600px;">
           <strong>Игра окончена!</strong><br>
           ${data.message}
         </div>
@@ -334,7 +422,7 @@
           btn.innerText = name;
           btn.dataset.name = name;
           if (correctHero && name === correctHero) {
-            btn.style.border = '2px solid #4caf50';
+            btn.style.border = '2px solid var(--success-color)';
           }
           grid.appendChild(btn);
         });
