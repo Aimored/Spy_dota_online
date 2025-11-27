@@ -23,25 +23,25 @@ const heroesByAttribute = {
     "Tidehunter", "Tiny", "Treant Protector", "Tusk", "Underlord", "Undying", "Wraith King"
   ],
   agility: [
-    "Anti-Mage", "Arc Warden", "Bloodseeker", "Bounty Hunter", "Clinkz", "Drow Ranger",
+    "Anti-Mage", "Bloodseeker", "Bounty Hunter", "Clinkz", "Drow Ranger",
     "Ember Spirit", "Faceless Void", "Gyrocopter", "Hoodwink", "Juggernaut", "Luna",
     "Medusa", "Meepo", "Monkey King", "Morphling", "Naga Siren", "Phantom Assassin",
     "Phantom Lancer", "Razor", "Riki", "Shadow Fiend", "Slark", "Sniper", "Templar Assassin",
     "Terrorblade", "Troll Warlord", "Ursa", "Viper", "Weaver"
   ],
   intelligence: [
-    "Ancient Apparition", "Crystal Maiden", "Death Prophet", "Disruptor", "Enchantress",
+    "Ancient Apparition","Chen", "Crystal Maiden", "Disruptor", "Enchantress",
     "Grimstroke", "Invoker", "Jakiro", "Keeper of the Light", "Leshrac", "Lich", "Lina",
     "Lion", "Muerta", "Nature’s Prophet", "Necrophos", "Oracle", "Outworld Destroyer", "Puck",
     "Pugna", "Queen of Pain", "Rubick", "Shadow Demon", "Shadow Shaman",
     "Silencer", "Skywrath Mage", "Storm Spirit", "Tinker", "Warlock", "Witch Doctor", "Zeus"
   ],
   universal: [
-    "Abaddon", "Bane", "Batrider", "Chen", "Beastmaster", "Brewmaster", "Broodmother",
-    "Clockwerk", "Dark Seer", "Dark Willow", "Dazzle", "Enigma", "Io", "Lone Druid",
+    "Abaddon", "Bane", "Batrider", "Beastmaster", "Brewmaster", "Broodmother",
+    "Clockwerk","Death Prophet", "Dark Seer", "Dark Willow", "Dazzle", "Enigma", "Io", "Lone Druid",
     "Lycan", "Magnus", "Marci", "Mirana", "Nyx Assassin", "Pangolier", "Phoenix", "Sand King",
     "Snapfire", "Techies", "Timbersaw", "Vengeful Spirit", "Venomancer", "Visage",
-    "Void Spirit", "Windranger", "Winter Wyvern"
+    "Void Spirit", "Windranger", "Winter Wyvern" ,"Arc Warden"
   ]
 };
 

@@ -52,7 +52,21 @@
       --success-color: #388e3c;
       --accent-color: #ad1457;
     }
-
+    [data-theme="soft-blue"] {
+      --bg-color: #e6f7ff;
+      --text-color: #0a3d5c;
+      --card-bg: #d0ebff;
+      --input-bg: #ffffff;
+      --btn-bg: #a5d8ff;
+      --btn-hover: #74c0fc;
+      --hero-bg: #b2f2ff;
+      --hero-hover: #67e6ff;
+      --highlight-bg: #fff3bf;
+      --highlight-border: #ffd43b;
+      --error-color: #ff6b72;
+      --success-color: #51cf66;
+      --accent-color: #0b72b9;
+    }
     body {
       font-family: Arial, sans-serif;
       text-align: center;
@@ -215,6 +229,7 @@
       <button onclick="setTheme('light')">Светлая</button>
       <button onclick="setTheme('dark')">Тёмная</button>
       <button onclick="setTheme('pink')">Розовая 💖</button>
+      <button onclick="setTheme('soft-blue')">Голубая 💙</button>
     </div>
   </div>
 
@@ -271,6 +286,7 @@
         document.documentElement.setAttribute('data-theme', theme);
         if (theme === 'dark') document.getElementById('themeToggleBtn').innerText = '🌙';
         if (theme === 'pink') document.getElementById('themeToggleBtn').innerText = '💖';
+        if (theme === 'soft-blue') document.getElementById('themeToggleBtn').innerText = '💎';
       }
       hideThemeMenu();
     }
