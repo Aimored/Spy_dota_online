@@ -270,7 +270,7 @@
     });
     
     let currentRoom = '';
-    let myId = '';
+    let myId = ''; // ← теперь будет установлен!
     let players = [];
     let isSpy = false;
     let gameEnded = false;
@@ -300,7 +300,6 @@
       document.getElementById('themeMenu').style.display = 'none';
     }
 
-    // Закрывать меню при клике вне его
     document.addEventListener('click', (e) => {
       const selector = document.getElementById('themeSelector');
       if (!selector.contains(e.target)) {
@@ -308,15 +307,19 @@
       }
     });
 
-    // Восстановление темы
     const savedTheme = localStorage.getItem('theme') || 'light';
     setTheme(savedTheme);
 
-    // === ОСТАЛЬНОЙ КОД ===
+    // === ОСНОВНАЯ ЛОГИКА ===
     socket.on('connect_error', () => {
       setTimeout(() => {
         socket.connect();
       }, 3000);
+    });
+
+    // 🔑 НОВОЕ: получаем свой ID
+    socket.on('joined', (data) => {
+      myId = data.myId;
     });
 
     function generateRoomCode() {
@@ -524,7 +527,7 @@
       const container = document.getElementById('playerButtons');
       container.innerHTML = '';
       players.forEach(player => {
-        if (player.id === myId) return;
+        if (player.id === myId) return; // ← теперь работает!
         const btn = document.createElement('div');
         btn.className = 'player-btn';
         btn.innerText = player.name;

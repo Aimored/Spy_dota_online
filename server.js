@@ -14,6 +14,28 @@ const io = socketIo(server, {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
+const allHeroes = [
+  "Abaddon", "Alchemist", "Ancient Apparition", "Anti-Mage", "Arc Warden", "Axe",
+  "Bane", "Batrider", "Beastmaster", "Bloodseeker", "Bounty Hunter", "Brewmaster",
+  "Bristleback", "Broodmother", "Centaur Warrunner", "Chaos Knight", "Chen", "Clinkz",
+  "Clockwerk", "Crystal Maiden", "Dark Seer", "Dark Willow", "Dawnbreaker", "Dazzle",
+  "Disruptor", "Doom", "Dragon Knight", "Drow Ranger", "Earth Spirit", "Earthshaker",
+  "Elder Titan", "Ember Spirit", "Enchantress", "Faceless Void", "Grimstroke", "Gyrocopter",
+  "Hoodwink", "Huskar", "Invoker", "Io", "Jakiro", "Juggernaut", "Keeper of the Light",
+  "Kunkka", "Legion Commander", "Leshrac", "Lich", "Lifestealer", "Lina", "Lion", "Lone Druid",
+  "Luna", "Lycan", "Magnus", "Marci", "Mars", "Medusa", "Meepo", "Mirana", "Monkey King",
+  "Morphling", "Muerta", "Naga Siren", "Nature's Prophet", "Necrophos", "Night Stalker",
+  "Nyx Assassin", "Ogre Magi", "Omniknight", "Oracle", "Outworld Destroyer", "Pangolier",
+  "Phantom Assassin", "Phantom Lancer", "Phoenix", "Primal Beast", "Puck", "Pudge",
+  "Queen of Pain", "Razor", "Riki", "Rubick", "Sand King", "Shadow Demon", "Shadow Fiend",
+  "Shadow Shaman", "Silencer", "Skywrath Mage", "Slardar", "Slark", "Snapfire", "Sniper",
+  "Spectre", "Spirit Breaker", "Storm Spirit", "Sven", "Techies", "Templar Assassin",
+  "Terrorblade", "Tidehunter", "Timbersaw", "Tinker", "Tiny", "Treant Protector",
+  "Troll Warlord", "Tusk", "Underlord", "Undying", "Ursa", "Vengeful Spirit", "Venomancer",
+  "Viper", "Visage", "Void Spirit", "Warlock", "Weaver", "Windranger", "Winter Wyvern",
+  "Witch Doctor", "Wraith King", "Zeus"
+];
+
 const heroesByAttribute = {
   strength: [
     "Ogre Magi", "Alchemist", "Axe", "Bristleback", "Centaur Warrunner", "Chaos Knight",
@@ -30,27 +52,38 @@ const heroesByAttribute = {
     "Terrorblade", "Troll Warlord", "Ursa", "Viper", "Weaver"
   ],
   intelligence: [
-    "Ancient Apparition","Chen", "Crystal Maiden", "Disruptor", "Enchantress",
+    "Ancient Apparition", "Chen", "Crystal Maiden", "Disruptor", "Enchantress",
     "Grimstroke", "Invoker", "Jakiro", "Keeper of the Light", "Leshrac", "Lich", "Lina",
-    "Lion", "Muerta", "Nature’s Prophet", "Necrophos", "Oracle", "Outworld Destroyer", "Puck",
-    "Pugna", "Queen of Pain", "Rubick", "Shadow Demon", "Shadow Shaman",
+    "Lion", "Muerta", "Nature's Prophet", "Necrophos", "Oracle", "Outworld Destroyer", "Puck",
+    "Queen of Pain", "Rubick", "Shadow Demon", "Shadow Shaman",
     "Silencer", "Skywrath Mage", "Storm Spirit", "Tinker", "Warlock", "Witch Doctor", "Zeus"
   ],
   universal: [
     "Abaddon", "Bane", "Batrider", "Beastmaster", "Brewmaster", "Broodmother",
-    "Clockwerk","Death Prophet", "Dark Seer", "Dark Willow", "Dazzle", "Enigma", "Io", "Lone Druid",
+    "Clockwerk", "Dark Seer", "Dark Willow", "Dazzle", "Io", "Lone Druid",
     "Lycan", "Magnus", "Marci", "Mirana", "Nyx Assassin", "Pangolier", "Phoenix", "Sand King",
     "Snapfire", "Techies", "Timbersaw", "Vengeful Spirit", "Venomancer", "Visage",
-    "Void Spirit", "Windranger", "Winter Wyvern" ,"Arc Warden"
+    "Void Spirit", "Windranger", "Winter Wyvern", "Arc Warden"
   ]
 };
 
 const rooms = {};
+const roomOrder = [];
+
+function cleanupRooms() {
+  while (roomOrder.length > 2) {
+    const oldestRoomId = roomOrder.shift();
+    delete rooms[oldestRoomId];
+    console.log(`🗑️ Комната ${oldestRoomId} удалена (лимит 2 комнат)`);
+  }
+}
 
 io.on('connection', (socket) => {
   socket.on('joinRoom', (data) => {
     const { roomId, playerName } = data;
-    if (!roomId || !playerName) return;
+    if (!roomId || !playerName || typeof playerName !== 'string' || playerName.trim() === '') return;
+
+    socket.emit('joined', { myId: socket.id });
 
     socket.join(roomId);
     if (!rooms[roomId]) {
@@ -63,9 +96,14 @@ io.on('connection', (socket) => {
         spyId: null,
         spyErrors: 0
       };
+      roomOrder.push(roomId);
+      cleanupRooms();
     }
-    const player = { id: socket.id, name: playerName };
-    rooms[roomId].players.push(player);
+
+    const existing = rooms[roomId].players.find(p => p.id === socket.id);
+    if (!existing) {
+      rooms[roomId].players.push({ id: socket.id, name: playerName.trim() });
+    }
     io.to(roomId).emit('updatePlayers', rooms[roomId].players);
   });
 
@@ -92,13 +130,12 @@ io.on('connection', (socket) => {
       if (i === spyIndex) {
         io.to(player.id).emit('chooseSpyHero', { heroesByAttribute });
       } else {
-        io.to(player.id).emit('yourRole', { 
-          role: trueHero, 
-          attribute: randomAttr 
+        io.to(player.id).emit('yourRole', {
+          role: trueHero,
+          attribute: randomAttr
         });
       }
     });
-    io.to(roomId).emit('gameStarted');
   });
 
   socket.on('spyGuess', ({ roomId, guess }) => {
@@ -136,20 +173,18 @@ io.on('connection', (socket) => {
     if (!room.votes[targetId]) room.votes[targetId] = [];
     const voterId = socket.id;
 
-    // Удаляем предыдущий голос
     for (const tId in room.votes) {
       room.votes[tId] = room.votes[tId].filter(id => id !== voterId);
     }
     room.votes[targetId].push(voterId);
 
-    const totalPlayers = room.players.length;
     const voteSummary = {};
     for (const tId in room.votes) {
       voteSummary[tId] = room.votes[tId].length;
     }
     io.to(roomId).emit('updateVotes', voteSummary);
 
-    // 🔍 Победа по голосованию: N-1 голосов против одного
+    const totalPlayers = room.players.length;
     let accusedId = null;
     for (const tId in room.votes) {
       if (room.votes[tId].length === totalPlayers - 1) {
@@ -161,13 +196,9 @@ io.on('connection', (socket) => {
     if (accusedId) {
       const accused = room.players.find(p => p.id === accusedId);
       const spy = room.players.find(p => p.id === room.spyId);
-
-      let message = '';
-      if (accusedId === room.spyId) {
-        message = `✅ Игроки выгнали шпиона! Это был ${spy.name}. Настоящий герой: ${room.trueHero}.`;
-      } else {
-        message = `❌ Игроки выгнали невиновного! Выгнан ${accused.name}. Шпион — ${spy.name}. Настоящий герой: ${room.trueHero}.`;
-      }
+      let message = accusedId === room.spyId
+        ? `✅ Игроки выгнали шпиона! Это был ${spy.name}. Настоящий герой: ${room.trueHero}.`
+        : `❌ Игроки выгнали невиновного! Выгнан ${accused.name}. Шпион — ${spy.name}. Настоящий герой: ${room.trueHero}.`;
 
       io.to(roomId).emit('gameEnd', {
         winner: accusedId === room.spyId ? 'players' : 'spy',
@@ -182,18 +213,18 @@ io.on('connection', (socket) => {
   socket.on('restartGame', ({ roomId }) => {
     const room = rooms[roomId];
     if (!room) return;
-
     room.started = false;
     room.votes = {};
     room.trueHero = null;
     room.heroAttribute = null;
     room.spyId = null;
     room.spyErrors = 0;
-
     io.to(roomId).emit('gameRestarted');
   });
 
-  socket.on('disconnect', () => {});
+  socket.on('disconnect', () => {
+    // При желании можно очищать комнаты с 0 игроков, но не обязательно
+  });
 });
 
 const PORT = parseInt(process.env.PORT, 10) || 3000;
