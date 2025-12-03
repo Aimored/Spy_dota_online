@@ -93,8 +93,8 @@ io.on('connection', (socket) => {
         votes: {},
         trueHero: null,
         heroAttribute: null,
-        spyId: null,
-        spyErrors: 0
+        spyIds: new Set(), // ← множество ID шпионов
+        spyErrors: {} // отдельно для каждого шпиона
       };
       roomOrder.push(roomId);
       cleanupRooms();
@@ -111,24 +111,40 @@ io.on('connection', (socket) => {
     const room = rooms[roomId];
     if (!room || room.started || room.players.length < 2) return;
 
+    const totalPlayers = room.players.length;
+
+    // ✅ Определяем количество шпионов
+    let numSpies = 1; // по умолчанию
+    if (Math.random() < 0.2 && totalPlayers > 2) { // 20% шанс, только если >2 игроков
+      numSpies = Math.floor(Math.random() * (totalPlayers - 1)) + 1; // от 1 до N-1
+    }
+
+    // Выбираем героев
     const attributes = Object.keys(heroesByAttribute);
     const randomAttr = attributes[Math.floor(Math.random() * attributes.length)];
     const heroList = heroesByAttribute[randomAttr];
     const trueHero = heroList[Math.floor(Math.random() * heroList.length)];
 
-    const spyIndex = Math.floor(Math.random() * room.players.length);
-    const spyId = room.players[spyIndex].id;
+    // Выбираем шпионов случайно
+    const shuffledPlayers = [...room.players].sort(() => 0.5 - Math.random());
+    const spyIds = new Set();
+    for (let i = 0; i < numSpies; i++) {
+      spyIds.add(shuffledPlayers[i].id);
+    }
 
+    // Сброс состояния
     room.started = true;
     room.votes = {};
     room.trueHero = trueHero;
     room.heroAttribute = randomAttr;
-    room.spyId = spyId;
-    room.spyErrors = 0;
+    room.spyIds = spyIds;
+    room.spyErrors = {};
 
-    room.players.forEach((player, i) => {
-      if (i === spyIndex) {
+    // Рассылка ролей
+    room.players.forEach(player => {
+      if (spyIds.has(player.id)) {
         io.to(player.id).emit('chooseSpyHero', { heroesByAttribute });
+        room.spyErrors[player.id] = 0;
       } else {
         io.to(player.id).emit('yourRole', {
           role: trueHero,
@@ -136,30 +152,41 @@ io.on('connection', (socket) => {
         });
       }
     });
+
+    console.log(`🎮 Комната ${roomId}: ${numSpies} шпион(ов) из ${totalPlayers} игроков`);
   });
 
   socket.on('spyGuess', ({ roomId, guess }) => {
     const room = rooms[roomId];
-    if (!room || socket.id !== room.spyId) return;
+    if (!room || !room.spyIds.has(socket.id)) return;
 
     if (guess === room.trueHero) {
-      const spy = room.players.find(p => p.id === room.spyId);
+      const spy = room.players.find(p => p.id === socket.id);
       io.to(roomId).emit('gameEnd', {
         winner: 'spy',
-        message: `Шпион угадал героя и победил! Это был ${spy.name}. Настоящий герой: ${room.trueHero}.`,
-        spyName: spy.name,
+        message: `Шпион «${spy.name}» угадал героя! Настоящий герой: ${room.trueHero}. Шпионов было: ${room.spyIds.size}.`,
         trueHero: room.trueHero
       });
     } else {
-      room.spyErrors = (room.spyErrors || 0) + 1;
-      if (room.spyErrors >= 5) {
-        const spy = room.players.find(p => p.id === room.spyId);
-        io.to(roomId).emit('gameEnd', {
-          winner: 'players',
-          message: `Шпион раскрыт после 5 ошибок! Это был ${spy.name}. Настоящий герой: ${room.trueHero}.`,
-          spyName: spy.name,
-          trueHero: room.trueHero
-        });
+      room.spyErrors[socket.id] = (room.spyErrors[socket.id] || 0) + 1;
+      if (room.spyErrors[socket.id] >= 5) {
+        // Проверяем: остались ли ещё нераскрытые шпионы?
+        const activeSpies = room.players.filter(p => room.spyIds.has(p.id) && room.spyErrors[p.id] < 5);
+        if (activeSpies.length === 0) {
+          // Все шпионы совершили 5 ошибок
+          const spyNames = Array.from(room.spyIds).map(id => {
+            const p = room.players.find(pp => pp.id === id);
+            return p ? p.name : '???';
+          }).join(', ');
+          io.to(roomId).emit('gameEnd', {
+            winner: 'players',
+            message: `Все шпионы раскрыты после ошибок! Шпионы: ${spyNames}. Настоящий герой: ${room.trueHero}.`,
+            trueHero: room.trueHero
+          });
+        } else {
+          // Только личное уведомление об ошибке
+          io.to(socket.id).emit('heroIncorrect', { guess });
+        }
       } else {
         io.to(socket.id).emit('heroIncorrect', { guess });
       }
@@ -170,24 +197,30 @@ io.on('connection', (socket) => {
     const room = rooms[roomId];
     if (!room || !room.started) return;
 
-    if (!room.votes[targetId]) room.votes[targetId] = [];
     const voterId = socket.id;
+    if (!room.spyIds.has(voterId)) {
+      // Только не-шпионы могут голосовать (по классике)
+    }
 
+    if (!room.votes[targetId]) room.votes[targetId] = [];
+    
+    // Удаляем предыдущий голос игрока
     for (const tId in room.votes) {
       room.votes[tId] = room.votes[tId].filter(id => id !== voterId);
     }
     room.votes[targetId].push(voterId);
 
+    const nonSpyCount = room.players.filter(p => !room.spyIds.has(p.id)).length;
     const voteSummary = {};
     for (const tId in room.votes) {
       voteSummary[tId] = room.votes[tId].length;
     }
     io.to(roomId).emit('updateVotes', voteSummary);
 
-    const totalPlayers = room.players.length;
+    // Проверка: все не-шпионы проголосовали против одного игрока?
     let accusedId = null;
     for (const tId in room.votes) {
-      if (room.votes[tId].length === totalPlayers - 1) {
+      if (room.votes[tId].length === nonSpyCount && nonSpyCount > 0) {
         accusedId = tId;
         break;
       }
@@ -195,18 +228,27 @@ io.on('connection', (socket) => {
 
     if (accusedId) {
       const accused = room.players.find(p => p.id === accusedId);
-      const spy = room.players.find(p => p.id === room.spyId);
-      let message = accusedId === room.spyId
-        ? `✅ Игроки выгнали шпиона! Это был ${spy.name}. Настоящий герой: ${room.trueHero}.`
-        : `❌ Игроки выгнали невиновного! Выгнан ${accused.name}. Шпион — ${spy.name}. Настоящий герой: ${room.trueHero}.`;
+      const spyNames = Array.from(room.spyIds).map(id => {
+        const p = room.players.find(pp => pp.id === id);
+        return p ? p.name : '???';
+      }).join(', ');
 
-      io.to(roomId).emit('gameEnd', {
-        winner: accusedId === room.spyId ? 'players' : 'spy',
-        message: message,
-        spyName: spy.name,
-        trueHero: room.trueHero,
-        accusedName: accused.name
-      });
+      let message = '';
+      if (room.spyIds.has(accusedId)) {
+        message = `✅ Игроки выгнали шпиона! Выгнан ${accused.name}. Шпионы: ${spyNames}. Настоящий герой: ${room.trueHero}.`;
+        io.to(roomId).emit('gameEnd', {
+          winner: 'players',
+          message: message,
+          trueHero: room.trueHero
+        });
+      } else {
+        message = `❌ Игроки выгнали невиновного! Выгнан ${accused.name}. Шпионы: ${spyNames}. Настоящий герой: ${room.trueHero}.`;
+        io.to(roomId).emit('gameEnd', {
+          winner: 'spy',
+          message: message,
+          trueHero: room.trueHero
+        });
+      }
     }
   });
 
@@ -217,13 +259,13 @@ io.on('connection', (socket) => {
     room.votes = {};
     room.trueHero = null;
     room.heroAttribute = null;
-    room.spyId = null;
-    room.spyErrors = 0;
+    room.spyIds = new Set();
+    room.spyErrors = {};
     io.to(roomId).emit('gameRestarted');
   });
 
   socket.on('disconnect', () => {
-    // При желании можно очищать комнаты с 0 игроков, но не обязательно
+    // Опционально: можно удалять игрока из комнаты
   });
 });
 
